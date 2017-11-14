@@ -23,9 +23,72 @@
 
 package com.sybotan.garden.gardenkeeper.shell
 
+import jline.console.ConsoleReader
 import org.apache.commons.cli.*
 import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
+import java.util.*
+
+/**
+ * GardenKeeper Shell实现类
+ */
+class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) {
+    // 日志记录器
+    private val logger = LogManager.getLogger(GardenKeeperShell::class.java)
+    // 服务器地址
+    val server: String
+    // 连接超时时间
+    val timeout: Int
+    // 只读连接
+    val readonly: Boolean
+
+    var exitCmd: String = "exit"                // 退出命令
+
+    // 初始化
+    init {
+        this.server = server
+        this.timeout = timeout
+        this.readonly = readonly
+    } // init
+
+    /**
+     * 启动Shell
+     */
+    fun exec() {
+        // 如果在命令行启动，则使用功能完备的ConsoleReader。否则使用功能单一的Scanner。
+        if (null != System.console()) {
+            logger.debug("Console is ConsoleReader.")
+            var console = ConsoleReader()
+            do {
+                var command = console.readLine(getPrompt()).trim()
+                processCommand(command)
+            } while (command!! != exitCmd)
+        } else {
+            logger.debug("Console is Scanner.")
+            var console = Scanner(System.`in`)
+            do {
+                System.out.print(getPrompt())
+                var command = console.nextLine().trim()
+                processCommand(command)
+            } while (command!! != exitCmd)
+        }
+        return
+    } // Function exec()
+
+    /**
+     * 获得命令行提示符
+     */
+    fun getPrompt(): String = "GardenKeeper> "
+
+    /**
+     * 处理Shell命令
+     *
+     * @param  command      用户在Shell输入的命令
+     */
+    fun processCommand(command: String) {
+        logger.debug("command=$command")
+        return
+    } // Function processCommand()
+} // Class GardenKeeperShell
 
 /**
  * GardenKeeper Shell应用入口
@@ -33,6 +96,7 @@ import org.apache.logging.log4j.Logger
  * @param   args    保存命令行参数
  */
 fun main(args: Array<String>) {
+    // 日志记录器
     val logger = LogManager.getLogger("gardenkeeper")
     // 命令行语法定义
     val cmdLineSyntax = "gkCli [-s server:port[,server:port]...] [-t timeout] [-r]"
@@ -73,5 +137,7 @@ fun main(args: Array<String>) {
     logger.debug("readonly=$readonly")
 
     println("Connecting to  $server ...")
+    GardenKeeperShell(server, timeout, readonly).exec()
+
     return
 } // Function main()

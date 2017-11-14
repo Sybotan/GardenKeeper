@@ -43,7 +43,7 @@ repositories {
 
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
-    //日志的依赖
+    // 日志的依赖
     // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-core
     compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.9.1'
     // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-api

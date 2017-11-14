@@ -21,41 +21,54 @@
  * ********************************************************************************************************************
  */
 
-group 'com.sybotan.garden'
-version '1.0'
+package com.sybotan.garden.gardenkeeper.shell
 
-buildscript {
-    ext.kotlin_version = '1.1.51'
+import org.apache.commons.cli.*
 
-    repositories {
-        mavenCentral()
+/**
+ * GardenKeeper Shell应用入口
+ *
+ * @param   args    保存命令行参数
+ */
+fun main(args: Array<String>) {
+    // 命令行语法定义
+    val cmdLineSyntax = "gkCli [-s server:port[,server:port]...] [-t timeout] [-r]"
+    // 连接服务器地址
+    var server: String = "localhost:2181"
+    // 连接超时时间
+    var timeout: Int = 3000
+    // 是否只读方式打开
+    var readonly: Boolean = false
+
+    // 定义命令行
+    val opt = Options()
+    opt.addOption(Option("s","server", true,"server:port"))
+    opt.addOption(Option("t","timeout", true,"timeout"))
+    opt.addOption(Option("r","readonly", false,"readonly"))
+    opt.addOption(Option("h","help", false,"print help for the command."))
+
+    // 解析命令行
+    val cmdLine = DefaultParser().parse(opt, args)
+
+    // 处理-h/--help参数
+    if (cmdLine.hasOption("h")) {
+        val hf = HelpFormatter()
+        hf.printHelp(cmdLineSyntax, "", opt, "")
     }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    // 处理-s/--server参数
+    if (cmdLine.hasOption("s")) {
+        server = cmdLine.getOptionValue("s")
+        println("server=$server")
     }
-}
+    // 处理-t/--timeout参数
+    if (cmdLine.hasOption("t")) {
+        timeout = cmdLine.getOptionValue("t")!!.toInt()
+        println("timeout=$timeout")
+    }
+    // 处理-r参数
+    readonly = cmdLine.hasOption("r")
+    println("readonly=$readonly")
 
-apply plugin: 'kotlin'
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
-    // 命令行解析依赖
-    // https://mvnrepository.com/artifact/commons-cli/commons-cli
-    compile group: 'commons-cli', name: 'commons-cli', version: '1.4'
-}
-
-compileKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-
-task copyJars(type:Copy) {
-    from configurations.runtime
-    into "libs"
-}
+    println("Hello world!")
+    return
+} // Function main()

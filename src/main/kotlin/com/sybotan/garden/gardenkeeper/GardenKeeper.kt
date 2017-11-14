@@ -21,41 +21,7 @@
  * ********************************************************************************************************************
  */
 
-group 'com.sybotan.garden'
-version '1.0'
+package com.sybotan.garden.gardenkeeper
 
-buildscript {
-    ext.kotlin_version = '1.1.51'
-
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
-
-apply plugin: 'kotlin'
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
-    // 命令行解析依赖
-    // https://mvnrepository.com/artifact/commons-cli/commons-cli
-    compile group: 'commons-cli', name: 'commons-cli', version: '1.4'
-}
-
-compileKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-
-task copyJars(type:Copy) {
-    from configurations.runtime
-    into "libs"
+class GardenKeeper {
 }

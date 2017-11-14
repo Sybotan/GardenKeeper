@@ -24,6 +24,8 @@
 package com.sybotan.garden.gardenkeeper.shell
 
 import org.apache.commons.cli.*
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 
 /**
  * GardenKeeper Shell应用入口
@@ -31,6 +33,7 @@ import org.apache.commons.cli.*
  * @param   args    保存命令行参数
  */
 fun main(args: Array<String>) {
+    val logger = LogManager.getLogger("gardenkeeper")
     // 命令行语法定义
     val cmdLineSyntax = "gkCli [-s server:port[,server:port]...] [-t timeout] [-r]"
     // 连接服务器地址
@@ -58,17 +61,17 @@ fun main(args: Array<String>) {
     // 处理-s/--server参数
     if (cmdLine.hasOption("s")) {
         server = cmdLine.getOptionValue("s")
-        println("server=$server")
+        logger.debug("server=$server")
     }
     // 处理-t/--timeout参数
     if (cmdLine.hasOption("t")) {
         timeout = cmdLine.getOptionValue("t")!!.toInt()
-        println("timeout=$timeout")
+        logger.debug("timeout=$timeout")
     }
     // 处理-r参数
     readonly = cmdLine.hasOption("r")
-    println("readonly=$readonly")
+    logger.debug("readonly=$readonly")
 
-    println("Hello world!")
+    println("Connecting to  $server ...")
     return
 } // Function main()

@@ -27,16 +27,13 @@ import com.sybotan.server.shell.Shell
 import com.sybotan.server.shell.ShellCommand
 import org.apache.commons.cli.*
 import org.apache.logging.log4j.LogManager
-import org.apache.zookeeper.CreateMode
-import org.apache.zookeeper.KeeperException
-import org.apache.zookeeper.ZooKeeper
+import org.apache.zookeeper.*
 import org.apache.zookeeper.data.Stat
 import java.util.*
-import org.apache.zookeeper.AsyncCallback
-import org.apache.zookeeper.ZooDefs
-
-
-
+import org.apache.zookeeper.data.ACL
+import org.apache.zookeeper.data.Id
+import org.apache.zookeeper.ServerAdminClient.stat
+import org.apache.zookeeper.ZooDefs.OpCode.setACL
 
 
 
@@ -267,6 +264,15 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdAddauth(args: Array<String>) {
         logger.debug(args)
+        if (args.size < 2) {
+            return
+        }
+
+        var b: ByteArray? = null
+        if (args.size >= 3)
+            b = args[2].toByteArray()
+
+        gk.addAuthInfo(args[1], b)
         return
     } // Function cmdAddauth()
 
@@ -590,6 +596,24 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdSetAcl(args: Array<String>) {
         logger.debug(args)
+        if (args.size < 3) {
+            return
+        }
+
+        var path = absolutePath(args[1])
+        var version: Int = -1
+        try {
+            if (args.size > 4) {
+                version = Integer.parseInt(args[3])
+            }
+            var stat = gk.setACL(path, parseACLs(args[2]), version)
+            printStat(stat)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
+
         return
     } // Function cmdSetAcl()
 
@@ -748,7 +772,7 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
         return p.toString()
     } // getPermString（）
 
-    /*private fun parseACLs(aclString: String): List<ACL> {
+    private fun parseACLs(aclString: String): List<ACL> {
         val acl: MutableList<ACL>
         val acls = aclString.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
         acl = ArrayList()
@@ -767,7 +791,23 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
             acl.add(newAcl)
         }
         return acl
-    }*/
+    }
+
+    private fun getPermFromString(permString: String): Int {
+        var perm = 0
+        for (i in 0 until permString.length) {
+            when (permString[i]) {
+                'r' -> perm = perm or ZooDefs.Perms.READ
+                'w' -> perm = perm or ZooDefs.Perms.WRITE
+                'c' -> perm = perm or ZooDefs.Perms.CREATE
+                'd' -> perm = perm or ZooDefs.Perms.DELETE
+                'a' -> perm = perm or ZooDefs.Perms.ADMIN
+                else -> System.err
+                        .println("Unknown perm type: " + permString[i])
+            }
+        }
+        return perm
+    }
 } // Class GardenKeeperShell
 
 /**

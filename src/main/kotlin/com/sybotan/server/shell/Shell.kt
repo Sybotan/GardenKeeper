@@ -26,6 +26,12 @@ package com.sybotan.server.shell
 import jline.console.ConsoleReader
 import org.apache.logging.log4j.LogManager
 import java.util.*
+import java.util.ArrayList
+import java.util.Map
+import java.util.Comparator
+
+
+
 
 open class Shell(exitCmd: String = "exit") {
     // 日志记录器
@@ -38,7 +44,11 @@ open class Shell(exitCmd: String = "exit") {
     // 初始化操作
     init {
         this.exitCmd = exitCmd
-        registCommand(ShellCommand(exitCmd, Shell::class.java.getDeclaredMethod("cmdExit", Array<String>::class.java)))
+        registCommand(ShellCommand(
+                exitCmd,
+                "",
+                Shell::class.java.getDeclaredMethod("cmdExit", Array<String>::class.java),
+                false))
     } // init
 
     /**
@@ -52,7 +62,7 @@ open class Shell(exitCmd: String = "exit") {
             do {
                 var command = console.readLine(getPrompt()).trim()
                 processCommand(command)
-            } while (command!! != exitCmd)
+            } while (command != exitCmd)
         } else {
             logger.debug("console = Scanner")
             var console = Scanner(System.`in`)
@@ -60,18 +70,22 @@ open class Shell(exitCmd: String = "exit") {
                 System.out.print(getPrompt())
                 var command = console.nextLine().trim()
                 processCommand(command)
-            } while (command!! != exitCmd)
+            } while (command != exitCmd)
         }
         return
     } // Function exec()
 
     /**
      * 获得命令行提示符
+     *
+     * @return  命令行提示符
      */
     open fun getPrompt(): String = "Sybatan> "
 
     /**
      * 如果需要网络连接执行的命令，则判断是否连接
+     *
+     * @return  连接到服务器返回true,否则返回false
      */
     open fun isConnected(): Boolean = true
 
@@ -82,6 +96,48 @@ open class Shell(exitCmd: String = "exit") {
         commandMap.put(cmd.command, cmd)
         return
     } // Function pubCommand()
+
+    /**
+     * 显示命令列晴
+     *
+     * @param   cmdSyntax       命令语法
+     * @param   needAlign       参数是否需要对齐显示
+     */
+    fun dumpCommands(cmdSyntax: String, needAlign: Boolean = false) {
+        // 命令语法不为空，打印命令语法
+        if (!cmdSyntax.isBlank()) {
+            println(cmdSyntax)
+        }
+
+        // 排序
+        val commandSet = commandMap.toList()
+        Collections.sort(commandSet, Comparator<Pair<String, ShellCommand>> { obj1, obj2 ->
+            obj1.first .compareTo(obj2.first)
+        })
+
+        // 如果参数需要对齐
+        if (needAlign) {
+            // 打印
+            for(cmd in commandSet) {
+                var c = cmd.first
+                if (c.length <= 20) {
+                    var str = "                                                        "
+                    println("    ${cmd.first}${str.substring(0, 24 - c.length)}${cmd.second.description}")
+                } else {
+                    println("    ${cmd.first}")
+                    println("                         ${cmd.second.description}")
+                }
+            }
+        } else {
+            // 打印
+            for(cmd in commandSet) {
+                println("    ${cmd.first} ${cmd.second.description}")
+            }
+        }
+
+
+        return
+    } // Function dumpCommands()
 
     /**
      * 退出命令

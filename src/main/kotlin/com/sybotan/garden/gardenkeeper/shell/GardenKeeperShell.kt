@@ -27,6 +27,19 @@ import com.sybotan.server.shell.Shell
 import com.sybotan.server.shell.ShellCommand
 import org.apache.commons.cli.*
 import org.apache.logging.log4j.LogManager
+import org.apache.zookeeper.CreateMode
+import org.apache.zookeeper.KeeperException
+import org.apache.zookeeper.ZooKeeper
+import org.apache.zookeeper.data.Stat
+import java.util.*
+import org.apache.zookeeper.AsyncCallback
+import org.apache.zookeeper.ZooDefs
+
+
+
+
+
+
 
 /**
  * GardenKeeper Shell实现类
@@ -35,13 +48,16 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
     // 日志记录器
     private val logger = LogManager.getLogger(GardenKeeperShell::class.java)
     // 服务器地址
-    val server: String
+    var server: String
     // 连接超时时间
-    val timeout: Int
+    var timeout: Int
     // 只读连接
-    val readonly: Boolean
+    var readonly: Boolean
 
-    var exitCmd: String = "exit"                // 退出命令
+    var gk: ZooKeeper
+    var watcher = ClientWatcher()
+
+    var currentPath = "/"
 
     // 初始化
     init {
@@ -51,17 +67,24 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
 
         // 注册命令
         registCommands()
+
+        // 连接到GK
+        gk = ZooKeeper(server, 3000, watcher, readonly)
     } // init
 
     /**
      * 获得命令行提示符
+     *
+     * @return  命令行提示符
      */
-    override fun getPrompt(): String = "GardenKeeper> "
+    override fun getPrompt(): String = "$server ${gk.state} $currentPath> "
 
     /**
      * 如果需要网络连接执行的命令，则判断是否连接
+     *
+     * @return  连接到服务器返回true,否则返回false
      */
-    override fun isConnected(): Boolean = false
+    override fun isConnected(): Boolean = gk.state.isConnected
 
     /**
      * 注册命令
@@ -69,141 +92,169 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
     private fun registCommands() {
         registCommand(ShellCommand(
                 "addauth",
+                "<scheme> <auth>",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdAddauth", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "cd",
+                "[path]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdCd", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "close",
+                "",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdClose", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "connect",
+                "[host[:port]]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdConnect", Array<String>::class.java),
                 false))
 
         registCommand(ShellCommand(
                 "create",
+                "[-s] [-e] path data acl",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdCreate", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "del",
+                "<path> [version]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdDelete", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "delete",
+                "<path> [version]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdDelete", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "deletequota",
+                "[-n|-b] <path>",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdDeleteQuota", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "delquota",
+                "[-n|-b] path",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdDeleteQuota", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "get",
+                "[path] [watch]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdGet", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "getAcl",
+                "[path] [watch]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdGetAcl", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "getacl",
+                "[path] [watch]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdGetAcl", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "help",
+                "",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdHelp", Array<String>::class.java),
-                true))
+                false))
 
         registCommand(ShellCommand(
                 "listquota",
+                "[path]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdListQuota", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "lsquota",
+                "[path]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdListQuota", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "list",
+                "[path] [watch]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdList", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "ls",
+                "[path] [watch]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdList", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "list2",
+                "[path] [watch]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdList2", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "ls2",
+                "[path] [watch]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdList2", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "printwatches",
+                "on|off",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdPrintwatches", Array<String>::class.java),
                 false))
 
         registCommand(ShellCommand(
                 "pwd",
+                "",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdPwd", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "rmr",
+                "<path>",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdRmr", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "set",
+                "<path> <data> [version]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdSet", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "setAcl",
+                "<path> <acl>",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdSetAcl", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "setacl",
+                "<path> <acl>",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdSetAcl", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "setquota",
+                "-n|-b <val> <path>",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdSetQuota", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "stat",
+                "[path] [watch]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdStat", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
                 "sync",
+                "[path]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdSync", Array<String>::class.java),
                 true))
         return
@@ -226,6 +277,17 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdCd(args: Array<String>) {
         logger.debug(args)
+        if (args.size < 2) {
+            cmdPwd(args)
+            return
+        }
+
+        val path = absolutePath(args[1])
+        if (existPath(path)) {
+            currentPath = path
+        } else {
+            println("Path '$path' does not exist.")
+        }
         return
     } // Function cmdCd()
 
@@ -236,6 +298,7 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdClose(args: Array<String>) {
         logger.debug(args)
+        gk.close()
         return
     } // Function cmdClose()
 
@@ -246,6 +309,10 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdConnect(args: Array<String>) {
         logger.debug(args)
+        if (args.size >= 2) {
+            server = args[1]
+        }
+        connectGk(server)
         return
     } // Function cmdConnect()
 
@@ -256,6 +323,14 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdCreate(args: Array<String>) {
         logger.debug(args)
+        if (args.size < 3) {
+            return
+        }
+        var first = 0
+        val flags = CreateMode.PERSISTENT
+
+        var path = args[first + 1];
+        val newPath = gk.create(path, args[first+2].toByteArray(), null, flags)
         return
     } // Function cmdCreate()
 
@@ -266,6 +341,23 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdDelete(args: Array<String>) {
         logger.debug(args)
+        if (args.size < 2) {
+            return
+        }
+
+        var path = absolutePath(args[1])
+        var version: Int = -1
+        try {
+            if (args.size >=3 ) {
+                version = Integer.parseInt(args[2])
+            }
+            gk.delete(path, version)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
+
         return
     } // Function cmdDelete()
 
@@ -276,6 +368,22 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdDeleteQuota(args: Array<String>) {
         logger.debug(args)
+        if (args.size < 2) {
+            return
+        }
+
+        var path = absolutePath(args[1])
+        var version: Int = -1
+        try {
+            if (args.size >=3 ) {
+                version = Integer.parseInt(args[2])
+            }
+            gk.delete(path, version)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        }  catch (e: Exception) {
+            // DO NOTHING
+        }
         return
     } // Function cmdDeleteQuota()
 
@@ -286,6 +394,23 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdGet(args: Array<String>) {
         logger.debug(args)
+
+        val stat = Stat()
+        var path = ""
+        try {
+            if (args.size >= 2) {
+                path = args[1]
+            }
+            path = absolutePath(path)
+            var data = gk.getData(path, watcher, stat)
+            println(String(data))
+            printStat(stat)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
+
         return
     } // Function cmdGet()
 
@@ -296,6 +421,22 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdGetAcl(args: Array<String>) {
         logger.debug(args)
+        val stat = Stat()
+        var path = ""
+        try {
+            if (args.size >= 2) {
+                path = args[1]
+            }
+            path = absolutePath(path)
+            val aclList = gk.getACL(path, stat);
+            for (acl in aclList) {
+                println("${acl.id}:${permToString(acl.perms)}")
+            }
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
         return
     } // Function cmdGetAcl()
 
@@ -306,8 +447,61 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdHelp(args: Array<String>) {
         logger.debug(args)
+        dumpCommands("gkCli [-s server:port[,server:port]...] [-t timeout] [-r] [cmd] [args]", false)
         return
     } // Function cmdHelp()
+
+    /**
+     * 处理ls/list命令
+     *
+     * @param   args    命令参数
+     */
+    fun cmdList(args: Array<String>) {
+        logger.debug(args)
+
+        var children: List<String>? = null
+        var path = ""
+        try {
+            if (args.size >= 2) {
+                path = args[1]
+            }
+            path = absolutePath(path)
+            children = gk.getChildren(path, watcher)
+            println(children)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
+        return
+    } // Function cmdList()
+
+    /**
+     * 处理ls2/list2命令
+     *
+     * @param   args    命令参数
+     */
+    fun cmdList2(args: Array<String>) {
+        logger.debug(args)
+
+        var children: List<String>? = null
+        val stat = Stat()
+        var path = ""
+        try {
+            if (args.size >= 2) {
+                path = args[1]
+            }
+            path = absolutePath(path)
+            children = gk.getChildren(path, watcher, stat)
+            println(children)
+            printStat(stat)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
+        return
+    } // Function cmdLs2()
 
     /**
      * 处理lsquota/listquota命令
@@ -320,32 +514,22 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
     } // Function cmdListQuota()
 
     /**
-     * 处理ls/list命令
-     *
-     * @param   args    命令参数
-     */
-    fun cmdList(args: Array<String>) {
-        logger.debug(args)
-        return
-    } // Function cmdList()
-
-    /**
-     * 处理ls2/list2命令
-     *
-     * @param   args    命令参数
-     */
-    fun cmdList2(args: Array<String>) {
-        logger.debug(args)
-        return
-    } // Function cmdLs2()
-
-    /**
      * 处理printwatches命令
      *
      * @param   args    命令参数
      */
     fun cmdPrintwatches(args: Array<String>) {
         logger.debug(args)
+        if (args.size >= 2) {
+            watcher.printWatches = (args[1] == "on")
+        }
+
+        var watch = "off"
+        if (watcher.printWatches)
+        {
+            watch = "on"
+        }
+        println("printwatches is $watch")
         return
     } // Function cmdPrintwatches()
 
@@ -356,6 +540,7 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdPwd(args: Array<String>) {
         logger.debug(args)
+        println(currentPath)
         return
     } // Function cmdPwd()
 
@@ -376,6 +561,25 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdSet(args: Array<String>) {
         logger.debug(args)
+        if (args.size < 3) {
+            return
+        }
+
+        var path = absolutePath(args[1])
+        var version: Int = -1
+        var data = args[2].toByteArray()
+        try {
+            if (args.size >=4 ) {
+                version = Integer.parseInt(args[3])
+            }
+            val stat = gk.setData(path, data, version)
+            printStat(stat)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
+
         return
     } // Function cmdPwd()
 
@@ -406,6 +610,20 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdStat(args: Array<String>) {
         logger.debug(args)
+
+        var path = ""
+        try {
+            if (args.size >= 2) {
+                path = args[1]
+            }
+            path = absolutePath(path)
+            val stat = gk.exists(path, args.size >= 3)
+            printStat(stat)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
         return
     } // Function cmdStat()
 
@@ -416,8 +634,140 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdSync(args: Array<String>) {
         logger.debug(args)
+        var path = ""
+        try {
+            if (args.size >= 2) {
+                path = args[1]
+            }
+            path = absolutePath(path)
+            gk.sync(path, AsyncCallback.VoidCallback { rc, path, ctx -> println("Sync returned " + rc) }, null)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
         return
     } // Function cmdSync()
+
+    /**
+     * 连接到GK
+     *
+     * @param   new     新服务器地址
+     */
+    private fun connectGk(newHost: String) {
+        if (gk.state.isAlive) {
+            gk.close()
+        }
+
+        server = newHost
+        currentPath = "/"
+        gk = ZooKeeper(server, timeout, watcher, false)
+        return
+    } // Function connectGk()
+
+    /**
+     * 将path转换成绝对路径
+     *
+     * @param   path        要转换的路径
+     * @param   currPath    当关路径
+     * @return  path的绝对路径
+     */
+    private fun absolutePath(path: String, currPath: String = currentPath): String {
+        // 如果路径为空字符串，则返回当前路径
+        if (path.isBlank() || "." == path) {
+            return currPath
+        }
+        // 将Windows路径分隔符转换成linux路径分隔符
+        var newPath : String = path.replace("\\", "/")
+        if (path.startsWith("..")) {
+            newPath = currPath.substring(0, currPath.lastIndexOf("/")) + path.substring(2)
+        } else if (!path.startsWith("/")) { // 如果path不是以”/“打头，则拼接当前路径
+            newPath = currPath + "/" + path
+        }
+
+        // 将"//"转换为"/"
+        newPath = newPath.replace("//", "/")
+
+        // 如果路径不是以”/”打头，则增加“/”
+        if (!newPath.startsWith("/")) {
+            newPath = "/" + newPath
+        }
+        return newPath
+    } // Function absolutePath()
+
+    /**
+     * 判断节点路径是否存在
+     *
+     * @param   path  节点路径
+     * @return  存在返回true，否则返回false
+     */
+    private fun existPath(path: String): Boolean = (gk.exists(path, false) != null)
+    /**
+     * 打印节点状态信息
+     *
+     * @param stat  节点状态
+     */
+    private fun printStat(stat: Stat) {
+        println("cZxid = 0x" + java.lang.Long.toHexString(stat.czxid))
+        println("ctime = " + Date(stat.ctime).toString())
+        println("mZxid = 0x" + java.lang.Long.toHexString(stat.mzxid))
+        println("mtime = " + Date(stat.mtime).toString())
+        println("pZxid = 0x" + java.lang.Long.toHexString(stat.pzxid))
+        println("cversion = " + stat.cversion)
+        println("dataVersion = " + stat.version)
+        println("aclVersion = " + stat.aversion)
+        println("ephemeralOwner = 0x" + java.lang.Long.toHexString(stat.ephemeralOwner))
+        println("dataLength = " + stat.dataLength)
+        println("numChildren = " + stat.numChildren)
+        return
+    } // Function printStat()
+
+    /**
+     * 权限转字符串
+     *
+     * @param   perms       整数描述的权限
+     * @return  字符串描述的权限
+     */
+    private fun permToString(perms: Int): String {
+        val p = StringBuilder()
+        if (perms and ZooDefs.Perms.CREATE != 0) {
+            p.append('c')
+        }
+        if (perms and ZooDefs.Perms.DELETE != 0) {
+            p.append('d')
+        }
+        if (perms and ZooDefs.Perms.READ != 0) {
+            p.append('r')
+        }
+        if (perms and ZooDefs.Perms.WRITE != 0) {
+            p.append('w')
+        }
+        if (perms and ZooDefs.Perms.ADMIN != 0) {
+            p.append('a')
+        }
+        return p.toString()
+    } // getPermString（）
+
+    /*private fun parseACLs(aclString: String): List<ACL> {
+        val acl: MutableList<ACL>
+        val acls = aclString.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+        acl = ArrayList()
+        for (a in acls) {
+            val firstColon = a.indexOf(':')
+            val lastColon = a.lastIndexOf(':')
+            if (firstColon == -1 || lastColon == -1 || firstColon == lastColon) {
+                System.err
+                        .println(a + " does not have the form scheme:id:perm")
+                continue
+            }
+            val newAcl = ACL()
+            newAcl.id = Id(a.substring(0, firstColon), a.substring(
+                    firstColon + 1, lastColon))
+            newAcl.perms = getPermFromString(a.substring(lastColon + 1))
+            acl.add(newAcl)
+        }
+        return acl
+    }*/
 } // Class GardenKeeperShell
 
 /**
@@ -429,7 +779,7 @@ fun main(args: Array<String>) {
     // 日志记录器
     val logger = LogManager.getLogger("gardenkeeper")
     // 命令行语法定义
-    val cmdLineSyntax = "gkCli [-s server:port[,server:port]...] [-t timeout] [-r]"
+    val cmdLineSyntax = "gkCli [-s server:port[,server:port]...] [-t timeout] [-r] [cmd] [args]"
     // 连接服务器地址
     var server: String = "localhost:2181"
     // 连接超时时间

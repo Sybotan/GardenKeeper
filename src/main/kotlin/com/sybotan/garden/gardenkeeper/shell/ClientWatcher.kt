@@ -21,51 +21,24 @@
  * ********************************************************************************************************************
  */
 
-group 'com.sybotan.garden'
-version '1.0'
+package com.sybotan.garden.gardenkeeper.shell
 
-buildscript {
-    ext.kotlin_version = '1.1.51'
+import org.apache.zookeeper.WatchedEvent
+import org.apache.zookeeper.Watcher
 
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
+class ClientWatcher : Watcher {
+    // 是否打印监视信息
+    var printWatches: Boolean = false
 
-apply plugin: 'kotlin'
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
-    // 日志的依赖
-    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-core
-    compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.9.1'
-    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-api
-    compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.9.1'
-    // 命令行解析依赖
-    // https://mvnrepository.com/artifact/commons-cli/commons-cli
-    compile group: 'commons-cli', name: 'commons-cli', version: '1.4'
-    // 控制台
-    // https://mvnrepository.com/artifact/jline/jline
-    compile group: 'jline', name: 'jline', version: '2.14.5'
-    // https://mvnrepository.com/artifact/org.apache.zookeeper/zookeeper
-    compile group: 'org.apache.zookeeper', name: 'zookeeper', version: '3.4.10'
-}
-
-compileKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-
-task copyJars(type:Copy) {
-    from configurations.runtime
-    into "libs"
-}
+    /**
+     * 处理监视事件
+     *
+     * @param event     监视事件
+     */
+    override fun process(event: WatchedEvent) {
+        if (printWatches) {
+            println("WATCHER::$event")
+        }
+        return
+    } // Function process()
+} // Class ClientWatcher

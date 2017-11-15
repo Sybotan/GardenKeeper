@@ -27,6 +27,7 @@ import java.lang.reflect.Method
 
 data class ShellCommand(
         val command: String,                        // 命令名
+        val description: String = "",               // 描述
         val method: Method,                         // 命令对应的方法
         val needConnected: Boolean = true           // 是否需要网络
     )

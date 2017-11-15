@@ -32,11 +32,7 @@ import org.apache.zookeeper.data.Stat
 import java.util.*
 import org.apache.zookeeper.data.ACL
 import org.apache.zookeeper.data.Id
-import org.apache.zookeeper.ServerAdminClient.stat
-import org.apache.zookeeper.ZooDefs.OpCode.setACL
-
-
-
+import org.apache.zookeeper.CreateMode
 
 /**
  * GardenKeeper Shell实现类
@@ -113,7 +109,7 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
 
         registCommand(ShellCommand(
                 "create",
-                "[-s] [-e] path data acl",
+                "[-s] [-e] <path> <data> [acl]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdCreate", Array<String>::class.java),
                 true))
 
@@ -329,14 +325,34 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdCreate(args: Array<String>) {
         logger.debug(args)
-        if (args.size < 3) {
+        if (args.size < 3)
+        {
             return
         }
-        var first = 0
-        val flags = CreateMode.PERSISTENT
 
-        var path = args[first + 1];
-        val newPath = gk.create(path, args[first+2].toByteArray(), null, flags)
+        var first = 0
+        var aclList: List<ACL> = ZooDefs.Ids.OPEN_ACL_UNSAFE;
+        var flags = CreateMode.PERSISTENT
+        if (args[1].equals("-e") && args[2].equals("-s") || args[1].equals("-s") && args[2].equals("-e")) {
+            first += 2
+            flags = CreateMode.EPHEMERAL_SEQUENTIAL
+        } else if (args[1].equals("-e")) {
+            first++
+            flags = CreateMode.EPHEMERAL
+        } else if (args[1].equals("-s")) {
+            first++
+            flags = CreateMode.PERSISTENT_SEQUENTIAL
+        }
+        if (args.size === first + 4) {
+            aclList = parseACLs(args[first + 3])
+        }
+        val path = absolutePath(args[first + 1])
+        try {
+            val newPath = gk.create(path, args[first + 2].toByteArray(), aclList, flags)
+            println("Created " + newPath)
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
         return
     } // Function cmdCreate()
 

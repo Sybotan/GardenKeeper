@@ -34,6 +34,16 @@ import org.apache.zookeeper.data.ACL
 import org.apache.zookeeper.data.Id
 import org.apache.zookeeper.CreateMode
 import org.apache.zookeeper.StatsTrack
+import org.apache.zookeeper.KeeperException
+import org.apache.zookeeper.Quotas
+import java.io.IOException
+import org.apache.zookeeper.ZooKeeper
+
+
+
+
+
+
 
 /**
  * GardenKeeper Shell实现类
@@ -397,22 +407,18 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdDeleteQuota(args: Array<String>) {
         logger.debug(args)
-        if (args.size < 2) {
-            return
+        if (args.size == 2) {
+            val path = absolutePath(args[1])
+            deleteQuota(gk, path, true, true)
+        } else if (args.size == 3) {
+            val opt = args[1]
+            val path = absolutePath(args[2])
+            when(opt) {
+                "-b"->deleteQuota(gk, path, false, true)
+                "-n"->deleteQuota(gk, path, true, false)
+            }
         }
 
-        var path = absolutePath(args[1])
-        var version: Int = -1
-        try {
-            if (args.size >=3 ) {
-                version = Integer.parseInt(args[2])
-            }
-            gk.delete(path, version)
-        } catch (e: KeeperException.NoNodeException) {
-            println("Path '$path' does not exist.")
-        }  catch (e: Exception) {
-            // DO NOTHING
-        }
         return
     } // Function cmdDeleteQuota()
 
@@ -666,6 +672,17 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      */
     fun cmdSetQuota(args: Array<String>) {
         logger.debug(args)
+        if (args.size < 4) {
+            return
+        }
+
+        val opt = args[1]
+        val value = args[2]
+        var path = absolutePath(args[3])
+        when(opt) {
+            "-b"-> println()
+            "-n"-> println()
+        }
         return
     } // Function cmdSetQuota()
 
@@ -767,7 +784,85 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
      * @param   path  节点路径
      * @return  存在返回true，否则返回false
      */
-    private fun existPath(path: String): Boolean = (gk.exists(path, false) != null)
+    private fun existPath(path: String): Boolean {
+        try {
+            return null != gk.exists(path, false)
+        } catch (e: Exception) {
+            logger.debug(e)
+        }
+        return false
+    } // Function existPath()
+
+    /**
+     * 删除节点配额。
+     *
+     * @param   gk          GardenKeeper对象
+     * @param   path        节点路径（全路径）
+     * @param   delNum      删除子节点数配额
+     * @param   delByte     删除节点字节数配额
+     */
+    fun deleteQuota(gk: ZooKeeper, path: String, delNum: Boolean, delByte: Boolean) {
+        val parentPath = Quotas.quotaZookeeper + path
+        val quotaPath = Quotas.quotaZookeeper + path + "/" + Quotas.limitNode
+        if (!existPath(quotaPath)) {
+            println("Quota does not exist for $path")
+        }
+
+        var data: ByteArray? = null
+        try {
+            data = gk.getData(quotaPath, false, Stat())
+        } catch (e: Exception) {
+            logger.debug(e)
+        }
+
+        val strack = StatsTrack(String(data!!))
+
+        if (!delNum && delByte) {           // 只删除字节限制
+            strack.bytes = -1L
+            gk.setData(quotaPath, strack.toString().toByteArray(), -1)
+        } else if (delNum && !delByte) {    // 只删除子节点
+            strack.count = -1
+            gk.setData(quotaPath, strack.toString().toByteArray(), -1)
+        } else if (delNum && delByte) {    // 删除所有限制
+            // 删除相关节点
+            val children = gk.getChildren(parentPath, false)
+            for (child in children) {
+                gk.delete(parentPath + "/" + child, -1)
+            }
+
+            try {
+                // 清除不再使用的父级节点
+                trimProcQuotas(gk, parentPath)
+            } catch (e: Exception) {
+                return
+            }
+        }
+
+        return
+    } // Function deleteQuota()
+
+    /**
+     * 删除节点path及path祖先节点（如果path删除后，祖先节点的子节点为空）
+     *
+     * @param   gk      GardenKeeper对象
+     * @param   path    节点路径
+     */
+    @Throws(KeeperException::class, IOException::class, InterruptedException::class)
+    private fun trimProcQuotas(gk: ZooKeeper, path: String) {
+        if (Quotas.quotaZookeeper == path) {
+            return
+        }
+
+        val children = gk.getChildren(path, false)
+        if (children.size == 0) {
+            gk.delete(path, -1)
+            val parent = path.substring(0, path.lastIndexOf('/'))
+            trimProcQuotas(gk, parent)
+        } else {
+            return
+        }
+    } // Function trimProcQuotas()
+
     /**
      * 打印节点状态信息
      *

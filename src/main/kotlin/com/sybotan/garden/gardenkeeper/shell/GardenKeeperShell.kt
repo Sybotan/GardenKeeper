@@ -38,8 +38,8 @@ import org.apache.zookeeper.KeeperException
 import org.apache.zookeeper.Quotas
 import java.io.IOException
 import org.apache.zookeeper.ZooKeeper
-
-
+import org.apache.zookeeper.ZooDefs.Ids
+import org.apache.zookeeper.ZooKeeperMain.createQuota
 
 
 
@@ -680,8 +680,8 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
         val value = args[2]
         var path = absolutePath(args[3])
         when(opt) {
-            "-b"-> println()
-            "-n"-> println()
+            "-b"-> createQuota(gk, path, java.lang.Long.parseLong(value), -1)
+            "-n"-> createQuota(gk, path, -1L, Integer.parseInt(value))
         }
         return
     } // Function cmdSetQuota()
@@ -792,6 +792,117 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
         }
         return false
     } // Function existPath()
+
+    /**
+     * 检查父节点是否有quota
+     */
+    @Throws(InterruptedException::class, KeeperException::class)
+    private fun checkIfParentQuota(zk: ZooKeeper, path: String) {
+        val splits = path.split("/".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+        var quotaPath = Quotas.quotaZookeeper
+        for (str in splits) {
+            if (str.length == 0) {
+                continue
+            }
+            quotaPath += "/" + str
+            var children: List<String>? = null
+            try {
+                children = zk.getChildren(quotaPath, false)
+            } catch (ne: KeeperException.NoNodeException) {
+                logger.debug("child removed during quota check", ne)
+                return
+            }
+
+            if (children!!.size == 0) {
+                return
+            }
+            for (child in children) {
+                if (Quotas.limitNode == child) {
+                    throw IllegalArgumentException(path + " has a parent "
+                            + quotaPath + " which has a quota")
+                }
+            }
+        }
+    } // Function checkIfParentQuota()
+
+    /**
+     * 创建节点配额
+     *
+     * @param
+     */
+    @Throws(KeeperException::class, IOException::class, InterruptedException::class)
+    fun createQuota(gk: ZooKeeper, path: String,
+                    bytes: Long, numNodes: Int): Boolean {
+        val initStat = gk.exists(path, false) ?: throw IllegalArgumentException(path + " does not exist.")
+
+        var quotaPath = Quotas.quotaZookeeper
+        val realPath = Quotas.quotaZookeeper + path
+        try {
+            val children = gk.getChildren(realPath, false)
+            for (child in children) {
+                if (!child.startsWith("zookeeper_")) {
+                    throw IllegalArgumentException(path + " has child " +
+                            child + " which has a quota")
+                }
+            }
+        } catch (ne: KeeperException.NoNodeException) {
+        }
+
+        checkIfParentQuota(gk, path)
+
+        if (gk.exists(quotaPath, false) == null) {
+            try {
+                gk.create(Quotas.procZookeeper, null, Ids.OPEN_ACL_UNSAFE,
+                        CreateMode.PERSISTENT)
+                gk.create(Quotas.quotaZookeeper, null, Ids.OPEN_ACL_UNSAFE,
+                        CreateMode.PERSISTENT)
+            } catch (ne: KeeperException.NodeExistsException) {
+                // DO NOTHING
+            }
+
+        }
+
+        val splits = path.split("/".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+        val sb = StringBuilder()
+        sb.append(quotaPath)
+        for (i in 1 until splits.size) {
+            sb.append("/" + splits[i])
+            quotaPath = sb.toString()
+            try {
+                gk.create(quotaPath, null, Ids.OPEN_ACL_UNSAFE,
+                        CreateMode.PERSISTENT)
+            } catch (ne: KeeperException.NodeExistsException) {
+                // DO NOTHING
+            }
+
+        }
+        val statPath = quotaPath + "/" + Quotas.statNode
+        quotaPath = quotaPath + "/" + Quotas.limitNode
+        val strack = StatsTrack(null)
+        strack.bytes = bytes
+        strack.count = numNodes
+        try {
+            gk.create(quotaPath, strack.toString().toByteArray(),
+                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
+            val stats = StatsTrack(null)
+            stats.bytes = 0L
+            stats.count = 0
+            gk.create(statPath, stats.toString().toByteArray(),
+                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
+        } catch (ne: KeeperException.NodeExistsException) {
+            val data = gk.getData(quotaPath, false, Stat())
+            val strackC = StatsTrack(String(data))
+            if (bytes != -1L) {
+                strackC.bytes = bytes
+            }
+            if (numNodes != -1) {
+                strackC.count = numNodes
+            }
+            gk.setData(quotaPath, strackC.toString().toByteArray(), -1)
+        }
+
+        return true
+    } // Function createQuota()
 
     /**
      * 删除节点配额。

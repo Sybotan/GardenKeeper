@@ -33,6 +33,7 @@ import java.util.*
 import org.apache.zookeeper.data.ACL
 import org.apache.zookeeper.data.Id
 import org.apache.zookeeper.CreateMode
+import org.apache.zookeeper.StatsTrack
 
 /**
  * GardenKeeper Shell实现类
@@ -156,22 +157,16 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
                 true))
 
         registCommand(ShellCommand(
+                "getquota",
+                "[path] [watch]",
+                GardenKeeperShell::class.java.getDeclaredMethod("cmdGetQuota", Array<String>::class.java),
+                true))
+
+        registCommand(ShellCommand(
                 "help",
                 "",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdHelp", Array<String>::class.java),
                 false))
-
-        registCommand(ShellCommand(
-                "listquota",
-                "[path]",
-                GardenKeeperShell::class.java.getDeclaredMethod("cmdListQuota", Array<String>::class.java),
-                true))
-
-        registCommand(ShellCommand(
-                "lsquota",
-                "[path]",
-                GardenKeeperShell::class.java.getDeclaredMethod("cmdListQuota", Array<String>::class.java),
-                true))
 
         registCommand(ShellCommand(
                 "list",
@@ -195,6 +190,18 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
                 "ls2",
                 "[path] [watch]",
                 GardenKeeperShell::class.java.getDeclaredMethod("cmdList2", Array<String>::class.java),
+                true))
+
+        registCommand(ShellCommand(
+                "listquota",
+                "[path]",
+                GardenKeeperShell::class.java.getDeclaredMethod("cmdGetQuota", Array<String>::class.java),
+                true))
+
+        registCommand(ShellCommand(
+                "lsquota",
+                "[path]",
+                GardenKeeperShell::class.java.getDeclaredMethod("cmdGetQuota", Array<String>::class.java),
                 true))
 
         registCommand(ShellCommand(
@@ -463,6 +470,35 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
     } // Function cmdGetAcl()
 
     /**
+     * 处理getquota/lsquota/listquota命令
+     *
+     * @param   args    命令参数
+     */
+    fun cmdGetQuota(args: Array<String>) {
+        logger.debug(args)
+        var path = ""
+        try {
+            if (args.size >= 2) {
+                path = args[1]
+            }
+            path = absolutePath(path)
+            var absolutePath = "${Quotas.quotaZookeeper}$path/${Quotas.limitNode}"
+            var stat = Stat()
+            var data = gk.getData(absolutePath, false, stat)
+            println("Output quota for $path ${StatsTrack(String(data))}")
+
+            absolutePath = "${Quotas.quotaZookeeper}$path/${Quotas.statNode}"
+            data = gk.getData(absolutePath, false, stat)
+            println("Output stat for $path ${StatsTrack(String(data))}")
+        } catch (e: KeeperException.NoNodeException) {
+            println("Path '$path' does not exist.")
+        } catch (e: Exception) {
+            // DO NOTHING
+        }
+        return
+    } // Function cmdListQuota()
+
+    /**
      * 处理help命令
      *
      * @param   args    命令参数
@@ -524,16 +560,6 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
         }
         return
     } // Function cmdLs2()
-
-    /**
-     * 处理lsquota/listquota命令
-     *
-     * @param   args    命令参数
-     */
-    fun cmdListQuota(args: Array<String>) {
-        logger.debug(args)
-        return
-    } // Function cmdListQuota()
 
     /**
      * 处理printwatches命令

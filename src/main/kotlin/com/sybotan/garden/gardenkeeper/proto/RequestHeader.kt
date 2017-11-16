@@ -21,27 +21,42 @@
  * ********************************************************************************************************************
  */
 
-package com.sybotan.garden.gardenkeeper
+package com.sybotan.gardenkeeper.proto
 
-/**
- * @author  Andy by 2017/11/16
- */
-class GardenKeeper {
+import org.apache.jute.InputArchive
+import org.apache.jute.OutputArchive
+import org.apache.jute.Record
 
-    /**
-     * 关闭连接
-     */
-    fun close() {
-        return
-    } // Function close()
+data class RequestHeader(
+        var xid: Int = 0,
+        var type: Int = 0
+    ) : Record {
 
     /**
-     * 删除节点
+     * 序列化
      *
-     * @param   path        节点的路径
-     * @param   version     版本
+     * @param output    序列化输出对象
+     * @param tag       序列化标签
      */
-    fun delete(path:String , version: Int = -1) {
+    override fun serialize(output: OutputArchive, tag: String) {
+        output.startRecord(this,tag)
+        output.writeInt(xid,"xid")
+        output.writeInt(type,"type")
+        output.endRecord(this,tag)
         return
-    } // Function delete()
-} // Class GardenKeeper
+    } // Function serialize()
+
+    /**
+     * 反序列化
+     *
+     * @param input     反序列化输入对象
+     * @param tag       返序列化标签
+     */
+    override fun deserialize(input: InputArchive, tag: String) {
+        input.startRecord(tag);
+        xid  = input.readInt("xid");
+        type = input.readInt("type");
+        input.endRecord(tag);
+        return
+    } // Function deserialize()
+} // Class RequestHeader

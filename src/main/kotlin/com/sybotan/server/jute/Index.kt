@@ -21,27 +21,12 @@
  * ********************************************************************************************************************
  */
 
-package com.sybotan.garden.gardenkeeper
+package com.sybotan.server.jute
 
 /**
- * @author  Andy by 2017/11/16
+ * @author Andy by 2017/11/16
  */
-class GardenKeeper {
-
-    /**
-     * 关闭连接
-     */
-    fun close() {
-        return
-    } // Function close()
-
-    /**
-     * 删除节点
-     *
-     * @param   path        节点的路径
-     * @param   version     版本
-     */
-    fun delete(path:String , version: Int = -1) {
-        return
-    } // Function delete()
-} // Class GardenKeeper
+interface Index {
+    abstract fun done(): Boolean
+    abstract fun incr()
+} // Class Index

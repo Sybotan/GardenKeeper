@@ -39,14 +39,11 @@ import org.apache.zookeeper.Quotas
 import java.io.IOException
 import org.apache.zookeeper.ZooKeeper
 import org.apache.zookeeper.ZooDefs.Ids
-import org.apache.zookeeper.ZooKeeperMain.createQuota
-
-
-
-
 
 /**
  * GardenKeeper Shell实现类
+ *
+ * @author Andy by 2017/11/16
  */
 class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell() {
     // 日志记录器
@@ -75,20 +72,6 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
         // 连接到GK
         gk = ZooKeeper(server, 3000, watcher, readonly)
     } // init
-
-    /**
-     * 获得命令行提示符
-     *
-     * @return  命令行提示符
-     */
-    override fun getPrompt(): String = "$server ${gk.state} $currentPath> "
-
-    /**
-     * 如果需要网络连接执行的命令，则判断是否连接
-     *
-     * @return  连接到服务器返回true,否则返回false
-     */
-    override fun isConnected(): Boolean = gk.state.isConnected
 
     /**
      * 注册命令
@@ -269,6 +252,37 @@ class GardenKeeperShell(server: String, timeout: Int, readonly: Boolean) : Shell
                 true))
         return
     } // Function registCommands()
+
+    /**
+     * 获得命令行提示符
+     *
+     * @return  命令行提示符
+     */
+    override fun getPrompt(): String = "$server ${gk.state} $currentPath> "
+
+    /**
+     * 如果需要网络连接执行的命令，则判断是否连接
+     *
+     * @return  连接到服务器返回true,否则返回false
+     */
+    override fun isConnected(): Boolean = gk.state.isConnected
+
+    /**
+     * 处理命令
+     *
+     * @param   command     用户在Shell输入的命令
+     */
+    override fun processCommand(command: String) {
+        try {
+            super.processCommand(command)
+        } catch (e: KeeperException.NoNodeException) {
+            println("Node '${e.path}' does not exist.")
+        } catch (e: Exception) {
+            logger.debug(e)
+        }
+
+        return
+    } // Function processCommand()
 
     /**
      * 处理addauth命令

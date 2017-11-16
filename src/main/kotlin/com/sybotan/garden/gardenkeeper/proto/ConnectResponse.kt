@@ -21,27 +21,48 @@
  * ********************************************************************************************************************
  */
 
-package com.sybotan.garden.gardenkeeper
+package com.sybotan.gardenkeeper.proto
 
-/**
- * @author  Andy by 2017/11/16
- */
-class GardenKeeper {
+import org.apache.jute.InputArchive
+import org.apache.jute.OutputArchive
+import org.apache.jute.Record
+
+data class ConnectResponse(
+        var protocolVersion: Int = 0,
+        var timeOut: Int = 0,
+        var sessionId: Long = 0,
+        var passwd: ByteArray? = null
+    ) : Record {
 
     /**
-     * 关闭连接
-     */
-    fun close() {
-        return
-    } // Function close()
-
-    /**
-     * 删除节点
+     * 序列化
      *
-     * @param   path        节点的路径
-     * @param   version     版本
+     * @param output    序列化输出对象
+     * @param tag       序列化标签
      */
-    fun delete(path:String , version: Int = -1) {
+    override fun serialize(output: OutputArchive, tag: String) {
+        output.startRecord(this,tag)
+        output.writeInt(protocolVersion,"protocolVersion")
+        output.writeInt(timeOut,"timeOut")
+        output.writeLong(sessionId,"sessionId")
+        output.writeBuffer(passwd,"passwd")
+        output.endRecord(this,tag)
         return
-    } // Function delete()
-} // Class GardenKeeper
+    } // Function serialize()
+
+    /**
+     * 反序列化
+     *
+     * @param input     反序列化输入对象
+     * @param tag       返序列化标签
+     */
+    override fun deserialize(input: InputArchive, tag: String) {
+        input.startRecord(tag)
+        protocolVersion = input.readInt("protocolVersion")
+        timeOut         = input.readInt("timeOut")
+        sessionId       = input.readLong("sessionId")
+        passwd          = input.readBuffer("passwd")
+        input.endRecord(tag)
+        return
+    } // Function deserialize()
+} // Class ConnectResponse

@@ -21,27 +21,29 @@
  * ********************************************************************************************************************
  */
 
-package com.sybotan.garden.gardenkeeper
+package com.sybotan.server.jute
+
+import java.io.IOException
 
 /**
  * @author  Andy by 2017/11/16
  */
-class GardenKeeper {
-
+interface Record {
     /**
-     * 关闭连接
-     */
-    fun close() {
-        return
-    } // Function close()
-
-    /**
-     * 删除节点
+     * 序列化
      *
-     * @param   path        节点的路径
-     * @param   version     版本
+     * @param output    序列化输出对象
+     * @param tag       序列化标签
      */
-    fun delete(path:String , version: Int = -1) {
-        return
-    } // Function delete()
-} // Class GardenKeeper
+    @Throws(IOException::class)
+    fun serialize(output: OutputArchive, tag: String)
+
+    /**
+     * 反序列化
+     *
+     * @param input     反序列化输入对象
+     * @param tag       反序列化标签
+     */
+    @Throws(IOException::class)
+    fun deserialize(input: InputArchive, tag: String)
+} // Class Record

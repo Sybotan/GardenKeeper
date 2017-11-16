@@ -26,6 +26,9 @@ package com.sybotan.garden.gardenkeeper.shell
 import org.apache.zookeeper.WatchedEvent
 import org.apache.zookeeper.Watcher
 
+/**
+ * @author  Andy by 2017/11/16
+ */
 class ClientWatcher : Watcher {
     // 是否打印监视信息
     var printWatches: Boolean = false

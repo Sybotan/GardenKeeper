@@ -21,27 +21,27 @@
  * ********************************************************************************************************************
  */
 
-package com.sybotan.garden.gardenkeeper
+package com.sybotan.garden.gardenkeeper.server
+
+import java.net.InetSocketAddress
+
+class GardenKeeperServer {
+    companion object {
+        val DEFAULT_TICK_TIME = 2000
+    } // companion object
+
+} // Class GardenKeeperServer
 
 /**
- * @author  Andy by 2017/11/16
+ * GardenKeeper Server应用入口
+ *
+ * @param   args    保存命令行参数
  */
-class GardenKeeper {
-
-    /**
-     * 关闭连接
-     */
-    fun close() {
-        return
-    } // Function close()
-
-    /**
-     * 删除节点
-     *
-     * @param   path        节点的路径
-     * @param   version     版本
-     */
-    fun delete(path:String , version: Int = -1) {
-        return
-    } // Function delete()
-} // Class GardenKeeper
+fun main(args: Array<String>) {
+    println("GardenKeeperServer is startting ...")
+    var factory = NettyServerCnxnFactory()
+    factory.configure(InetSocketAddress(2181))
+    factory.start()
+    println("Bye!!!")
+    return
+} // Function main()

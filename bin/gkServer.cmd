@@ -20,31 +20,11 @@ REM                 r                                                           
 REM
 REM ********************************************************************************************************************
 
-set GARDEN_CFGDIR=%~dp0%..\conf
-set GARDEN_LOG_DIR=%~dp0%..\log
-set GARDEN_LOG4J_PROP=INFO,CONSOLE
-
-REM add the cfg dir to classpath
-set CLASSPATH=%GARDEN_CFGDIR%
-
-REM make it work in the release
-SET CLASSPATH=%~dp0..\libs\*;%CLASSPATH%
-
-REM make it work for developers
-SET CLASSPATH=%~dp0..\build\classes;%~dp0..\build\libs\*;%CLASSPATH%
-
-set GARDEN_GKCFG=%GARDEN_CFGDIR%\garden.cfg
-
-REM 设置Java环境
-if not defined JAVA_HOME (
-  echo Error: JAVA_HOME is not set.
-  goto :eof
-)
-set JAVA_HOME=%JAVA_HOME:"=%
-
-if not exist "%JAVA_HOME%"\bin\java.exe (
-  echo Error: JAVA_HOME is incorrectly set.
-  goto :eof
-)
-
-set JAVA="%JAVA_HOME%"\bin\java
+setlocal
+call "%~dp0zkEnv.cmd"
+@echo on
+echo %CLASSPATH%
+@echo off
+set MAINCLASS=com.sybotan.garden.gardenkeeper.server.GardenKeeperServerKt
+call %JAVA% "-Dgardenkeeper.log.dir=%GARDEN_LOG_DIR%" "-Dgardenkeeper.root.logger=%GARDEN_LOG4J_PROP%" -cp "%CLASSPATH%" %MAINCLASS% "%GARDEN_CFG%" %*
+endlocal

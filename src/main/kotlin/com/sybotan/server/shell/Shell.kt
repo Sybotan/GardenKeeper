@@ -26,13 +26,11 @@ package com.sybotan.server.shell
 import jline.console.ConsoleReader
 import org.apache.logging.log4j.LogManager
 import java.util.*
-import java.util.ArrayList
-import java.util.Map
 import java.util.Comparator
 
-
-
-
+/**
+ * @author  Andy by 2017/11/14
+ */
 open class Shell(exitCmd: String = "exit") {
     // 日志记录器
     private val logger = LogManager.getLogger(Shell::class.java)
@@ -74,6 +72,16 @@ open class Shell(exitCmd: String = "exit") {
         }
         return
     } // Function exec()
+
+    /**
+     * 处理命令
+     *
+     * @param   command     用户在Shell输入的命令
+     */
+    protected open fun processCommand(command: String) {
+        execCommand(command)
+        return
+    } // Function processCommand()
 
     /**
      * 获得命令行提示符
@@ -150,11 +158,11 @@ open class Shell(exitCmd: String = "exit") {
     } // Function cmdExit()
 
     /**
-     * 处理Shell命令
+     * 执行Shell命令
      *
      * @param  command      用户在Shell输入的命令
      */
-    private fun processCommand(command: String) {
+    private fun execCommand(command: String) {
         logger.debug("command = $command")
         val cmdLine = command
         // 防止空指令
@@ -176,6 +184,6 @@ open class Shell(exitCmd: String = "exit") {
             println("Unknow command '$cmdLine'")
         }
         return
-    } // Function processCommand()
+    } // Function execCommand()
 
 } // Class Shell
